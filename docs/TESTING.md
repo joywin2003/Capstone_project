@@ -22,7 +22,7 @@ Automated results and the final Homework 4 test inventory are recorded once that
 ## Homework 3 verified results (6 November 2026)
 
 - Python 3.14.7; Flask 3.1.3; SQLAlchemy 2.1.8; PyMySQL 1.2.3; MySQL Community Server 8.4.11.
-- Stream tests: **9 passed**.
+- Stream tests: **11 passed** (including CSV/configuration boundary checks).
 - Real MySQL integration tests: **4 passed** (persistence, idempotency, rollback, Flask KPI/HTML output).
 - Temporary MySQL ran locally on port 33317 for verification. The documented Compose setup uses port 3307; Docker Compose itself was not run because this machine's Docker daemon was unavailable.
 - Offline SQLite smoke check: HTML table, building list, latest reading, and known-period KPIs all returned 200 with expected data.

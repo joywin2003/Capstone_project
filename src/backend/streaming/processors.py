@@ -50,7 +50,7 @@ class Pipeline(StreamProcessor):
 
 class ActiveMeterFilter(StreamProcessor):
     def __init__(self, min_power_kw=0.1):
-        if not isfinite(min_power_kw) or min_power_kw < 0:
+        if not isinstance(min_power_kw, (int, float)) or not isfinite(min_power_kw) or min_power_kw < 0:
             raise StreamProcessingError("Minimum power must be finite and nonnegative")
         self.min_power_kw = min_power_kw
 
@@ -62,7 +62,7 @@ class ActiveMeterFilter(StreamProcessor):
 
 class EnergyMetricsTransformer(StreamProcessor):
     def __init__(self, eur_per_kwh=0.30, kg_co2_per_kwh=0.38):
-        if any(not isfinite(x) or x < 0 for x in (eur_per_kwh, kg_co2_per_kwh)):
+        if any(not isinstance(x, (int, float)) or not isfinite(x) or x < 0 for x in (eur_per_kwh, kg_co2_per_kwh)):
             raise StreamProcessingError("Tariff and emissions factor must be finite/nonnegative")
         self.eur_per_kwh = eur_per_kwh
         self.kg_co2_per_kwh = kg_co2_per_kwh

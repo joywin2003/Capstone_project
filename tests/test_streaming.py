@@ -82,3 +82,19 @@ def test_csv_fixture_filters_two_events():
     pipeline = ActiveMeterFilter() + EnergyMetricsTransformer()
     assert len(list(pipeline.run(HistoricalEnergyStream.from_csv(fixture)))) == 3
     assert pipeline.dropped == 2
+
+
+def test_csv_invalid_boolean_or_missing_cell_has_domain_error(tmp_path):
+    for row in ['1,1,2016-12-01T00:00Z,1,15,maybe', '1,1,2016-12-01T00:00Z,1,15']:
+        path = tmp_path / 'invalid.csv'
+        path.write_text('building_id,meter_id,timestamp,energy_kwh,interval_minutes,active\n' + row + '\n')
+        with pytest.raises(StreamProcessingError, match='line 2'):
+            list(HistoricalEnergyStream.from_csv(path))
+
+
+def test_processor_configuration_has_domain_errors():
+    for value in [-1, float('inf'), 'bad']:
+        with pytest.raises(StreamProcessingError):
+            ActiveMeterFilter(value)
+        with pytest.raises(StreamProcessingError):
+            EnergyMetricsTransformer(eur_per_kwh=value)
