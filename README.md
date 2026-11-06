@@ -1,171 +1,119 @@
-# AI-Powered Smart Energy Management System for German Properties
+# Energy monitoring for German real estate portfolios
 
-An academic capstone project focused on energy monitoring, consumption analysis, forecasting, and AI-assisted energy optimization for German properties.
+Academic prototype for historical electricity analysis, reporting, forecasting, and an eventual energy advisor. Streamlit is the dashboard. No physical smart meters are required.
 
-## Project Overview
+## Identification
 
-The project aims to develop a Python-based prototype that helps users understand electricity consumption patterns, explore historical energy data, forecast future demand, and obtain AI-assisted energy-saving recommendations.
+Team: Shreya Patil, Joywin Bennis, Ourvish Lofur. Submitting student: Joywin Bennis (confirm course registration spelling). Student ID, module, lecturer, and individual contributions: **to be supplied by the students before submission**.
 
-The prototype uses historical electricity data and analytical methods. It does not require physical energy meters or live IoT devices.
+## Homework 2: real-time data processing
 
-## Project Objectives
+Implemented in `backend.streaming`: abstract processor, polymorphic filter and transformer, pipeline composition with `+`, explicit iterator with `__iter__`/`__next__`, and lazy generator output. The source replays historical interval events; this is simulated real-time processing, not a live IoT connection.
 
-- Analyze historical electricity consumption and energy-system data.
-- Present energy-related insights through an interactive dashboard.
-- Explore forecasting methods for identifying future consumption patterns.
-- Develop an AI-assisted energy advisor for explaining analytical results and suggesting potential optimization strategies.
-- Establish a modular and maintainable Python project structure.
-
-## Project Scope
-
-This project is an academic prototype for energy monitoring, forecasting, and AI-based optimization.
-
-The initial scope includes:
-- Historical data processing and validation.
-- Exploratory energy data analysis.
-- Forecasting experiments.
-- Interactive reporting and visualization.
-- AI-assisted explanations and recommendations.
-
-Physical meter integration, live IoT monitoring, and production deployment are outside the initial scope.
-
-## Project Team
-
-- Shreya Patil
-- Joywin Bennis
-- Ourvish Lofur
-
-## System Subsystems
-
-### 1. Energy Dashboard & Reporting
-**Planned technologies:** Streamlit, Plotly
-
-Responsible for presenting energy trends, analytical results, forecasts, and reporting visualizations.
-
-### 2. Data Management & Energy Analytics
-**Planned technologies:** Python, Pandas, PostgreSQL, Scikit-learn, Statsmodels
-
-Responsible for data preparation, validation, exploratory analysis, and supporting forecasting experiments.
-
-### 3. AI Energy Advisor & Integration
-**Planned technologies:** LangChain, OpenAI API, Docker
-
-Responsible for AI-assisted interpretation of energy insights and potential energy-saving recommendations.
-
-These are planned subsystem technologies; integration and compatibility will be verified as development progresses.
-
-## Dataset
-
-**Planned initial source:** Open Power System Data (OPSD), using relevant historical German electricity data.
-
-The selected dataset and its columns will be reviewed before analysis begins. National electricity-system data represents broader electricity demand and is not automatically equivalent to an individual property's consumption.
-
-## Technology Stack
-
-| Area | Technologies |
-|---|---|
-| Programming language | Python |
-| Data processing | Pandas, NumPy |
-| Visualization | Plotly |
-| Dashboard | Streamlit |
-| Machine learning | Scikit-learn |
-| Statistical forecasting | Statsmodels |
-| Configuration | python-dotenv |
-| Planned AI integration | LangChain, OpenAI API |
-| Planned database | PostgreSQL |
-| Planned containerization | Docker |
-
-## Repository Structure
-
-
-```text
-Capstone_project/
-|-- .streamlit/
-|   `-- config.toml
-|-- src/
-|   |-- app.py
-|   |-- data/
-|   |   |-- __init__.py
-|   |   `-- loader.py
-|   `-- ui/
-|       |-- __init__.py
-|       `-- dashboard/
-|           |-- __init__.py
-|           |-- *.py
-|           `-- static/
-|-- .env.example
-|-- .gitignore
-|-- pyproject.toml
-|-- README.md
-`-- requirements.txt
+```python
+pipeline = ActiveMeterFilter(min_power_kw=0.1) + EnergyMetricsTransformer()
+for result in pipeline.run(HistoricalEnergyStream.from_csv("data/sample/energy_events.csv")):
+    print(result)
 ```
 
-Local virtual environments, generated Python files, and downloaded datasets are excluded from version control.
+Average power is `energy_kwh * 60 / interval_minutes`. The filter removes inactive meters and power strictly below the threshold. The transformer calculates estimated EUR and kg CO2 using configurable demonstration factors. OPSD replay uses these same processors; all valid readings remain in storage so low-use filtering does not distort consumption reports.
 
-## Development Environment
+## Class diagrams
 
-The project currently uses Python 3.14.7 in a repository-local virtual environment.
+```mermaid
+classDiagram
+    class StreamProcessor {
+        <<abstract>>
+        +process(event)*
+        +__add__(other) Pipeline
+    }
+    class Pipeline {
+        +stages
+        +received
+        +emitted
+        +dropped
+        +process(event)
+        +__add__(other) Pipeline
+        +run(events) generator
+    }
+    class ActiveMeterFilter {
+        +min_power_kw
+        +process(event)
+    }
+    class EnergyMetricsTransformer {
+        +eur_per_kwh
+        +kg_co2_per_kwh
+        +process(event) EnergyResult
+    }
+    class HistoricalEnergyStream {
+        +from_csv(path)
+        +__iter__()
+        +__next__() EnergyEvent
+    }
+    class EnergyEvent {
+        +building_id
+        +meter_id
+        +timestamp
+        +energy_kwh
+        +interval_minutes
+        +active
+        +power_kw
+    }
+    class EnergyResult {
+        +event
+        +power_kw
+        +cost_eur
+        +co2_kg
+    }
+    StreamProcessor <|-- Pipeline
+    StreamProcessor <|-- ActiveMeterFilter
+    StreamProcessor <|-- EnergyMetricsTransformer
+    Pipeline o-- StreamProcessor
+    HistoricalEnergyStream ..> EnergyEvent : yields
+    EnergyMetricsTransformer ..> EnergyResult : creates
+    EnergyResult --> EnergyEvent : preserves input
+```
 
-The initial data analysis, visualization, dashboard, forecasting, and configuration dependencies have been installed and tested for successful imports. Additional dependencies will be evaluated when their subsystems are developed.
+```mermaid
+classDiagram
+    Building <|-- Home
+    Building <|-- Business
+    Building <|-- PublicBuilding
+    Building *-- Zone
+    Zone *-- Meter
+    Meter <|-- EnergyMeter
+    class Building {
+        <<abstract>>
+        +name
+        +floor_area_m2
+        +is_open(timestamp)*
+    }
+```
 
-### Initial Setup
+## Setup and demonstration
 
-1. Clone the repository.
-2. Open the project in PyCharm.
-3. Create or select a local virtual environment.
-4. Install the initial dependencies:
-
-   ```bash
-   python -m pip install -r requirements.txt
-   ```
-
-5. Verify dependency consistency:
-
-   ```bash
-   python -m pip check
-   ```
-
-### Run the Dashboard
-
-From the project directory:
+Use Python 3.14 or later, from the repository root:
 
 ```bash
-python -m streamlit run src/app.py
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[test]'
+python -m backend.streaming.demo
+python -m pytest tests/test_streaming.py -q
 ```
 
-### Environment Variables
+The small committed fixture is synthetic and yields `received=5 emitted=3 dropped=2`. It demonstrates an inactive meter, a low-power interval, and the inclusive threshold boundary. Prices (`0.30 EUR/kWh`) and emissions (`0.38 kg/kWh`) are illustrative assumptions.
 
-Copy `.env.example` to `.env` for local configuration when AI integration is introduced.
+To run the existing dashboard, install its dependencies from `requirements.txt`, then `python -m streamlit run src/app.py`. For full OPSD ingestion, follow [backend data instructions](src/backend/README.md). The raw dataset is not committed; the small fixture works offline after package installation.
 
-Add your own API credentials to `.env` only when needed. Never commit `.env` or expose API keys in source code.
+## Five-minute video
 
-## Visual Theme
+**Recording/link pending — the student must record and upload the demonstration before submission.** Follow the [video script](docs/VIDEO_SCRIPT.md), then replace this notice with the accessible video URL. No video has been uploaded by this implementation.
 
-The planned dashboard theme is **Midnight Blue + Sand + Bronze**.
+## Submission
 
-| Color | Hex |
-|---|---|
-| Midnight Blue | `#1E3045` |
-| Slate Blue | `#344B63` |
-| Warm Sand | `#F3EADF` |
-| Bronze | `#C09262` |
-| Espresso Brown | `#49372B` |
+Homework 2 branch: `HomeworkAssignment2`. Submit its verified GitHub branch URL and commit SHA, plus the video link. See the [homework plan](docs/HOMEWORK_PLAN.md) for the full roadmap. Homework 3 and 4 are cumulative follow-up branches.
 
-The theme is documented here for consistency; dashboard UI implementation will follow once the project is ready for that stage.
+## Scope and data assumptions
 
-## Project Status
-
-**Current phase:** Repository setup and environment validation.
-
-Completed:
-- Initial repository structure.
-- Python package initialization files.
-- Git ignore rules and environment template.
-- Initial dependency installation and import checks.
-- Local interpreter configuration in PyCharm.
-
-Next planned steps include project metadata, dataset assessment, data processing design, and subsystem development.
-
-## Academic Use
-
-This project is intended for educational and demonstration purposes. Forecasts and AI-generated recommendations should be evaluated against the available data and should not be treated as guaranteed energy savings.
+The wider capstone proposes portfolios, properties, buildings, electricity/gas/district heating, anomaly detection, forecasting, and an OpenAI advisor. This homework focuses on electricity and a few sample buildings. The existing OPSD import uses household-dataset residential/industrial/public columns; floor areas, tariffs, and benchmarks are assumptions. Existing seasonal forecasting is a baseline; the AI advisor is not yet integrated. PostgreSQL is a future capstone choice; Homework 3 uses the required MySQL database.
