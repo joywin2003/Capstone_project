@@ -5,9 +5,10 @@ and deterministic tests. Timestamps use canonical UTC text for schema compatibil
 """
 
 from contextvars import ContextVar
-from functools import lru_cache
+from functools import lru_cache, wraps
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from sqlalchemy import (CheckConstraint, Column, Float, ForeignKey, Integer,
                         MetaData, String, Table, UniqueConstraint, create_engine,
@@ -15,7 +16,12 @@ from sqlalchemy import (CheckConstraint, Column, Float, ForeignKey, Integer,
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.engine import make_url
+from sqlalchemy.pool import NullPool
+
 from backend import settings
+from backend.errors import ConfigurationError, DatabaseAccessError, IngestionError
 
 TS_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 DATABASE_OVERRIDE = ContextVar('energy_database_url', default=None)
@@ -45,13 +51,37 @@ reading_table = Table('reading', metadata,
     CheckConstraint('value >= 0', name='nonnegative_energy'))
 
 
+
+def database_operation(function):
+    """Translate driver failures at this subsystem boundary; retain their cause."""
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        try:
+            return function(*args, **kwargs)
+        except SQLAlchemyError as exc:
+            raise DatabaseAccessError('Energy data is temporarily unavailable') from exc
+    return wrapped
+
+
 def configured_url():
     return DATABASE_OVERRIDE.get() or settings.DATABASE_URL
 
 
 @lru_cache(maxsize=8)
 def engine_for(url):
-    engine = create_engine(url, pool_pre_ping=True)
+    try:
+        parsed = make_url(url)
+        options = {}
+        # File-based SQLite does not need idle pooled connections. Closing each
+        # one also makes temporary-test database cleanup deterministic.
+        if parsed.get_backend_name() == 'sqlite' and parsed.database not in {None, '', ':memory:'}:
+            options['poolclass'] = NullPool
+        engine = create_engine(parsed, pool_pre_ping=True, **options)
+    except (SQLAlchemyError, ValueError, ImportError) as exc:
+        raise ConfigurationError('Invalid DATABASE_URL or missing database driver') from exc
+    if engine.dialect.name not in {'mysql', 'sqlite'}:
+        engine.dispose()
+        raise ConfigurationError('Homework database must be MySQL or offline SQLite')
     if engine.dialect.name == 'sqlite':
         @event.listens_for(engine, 'connect')
         def foreign_keys(dbapi_connection, _):
@@ -59,6 +89,7 @@ def engine_for(url):
     return engine
 
 
+@database_operation
 def connect(path=None):
     url = configured_url()
     if path is not None:
@@ -66,6 +97,7 @@ def connect(path=None):
     return engine_for(url).connect()
 
 
+@database_operation
 def create_tables(con):
     metadata.create_all(con)
     con.commit()
@@ -86,6 +118,7 @@ def _get_or_create(con, table, identity, values):
     return row_id
 
 
+@database_operation
 def save_building(con, building):
     try:
         building.id = _get_or_create(con, building_table, {'name': building.name}, {
@@ -104,14 +137,16 @@ def save_building(con, building):
         raise
 
 
+@database_operation
 def save_readings(con, meter_id, values):
     if values.empty:
         return 0
-    if values.index.tz is None or not values.index.is_unique:
-        raise ValueError('Reading timestamps must be unique and timezone-aware')
-    import numpy as np
+    if not isinstance(values.index, pd.DatetimeIndex) or values.index.tz is None or not values.index.is_unique:
+        raise IngestionError('Reading timestamps must be unique and timezone-aware')
     if not np.isfinite(values.to_numpy(dtype=float)).all() or (values < 0).any():
-        raise ValueError('Readings must be finite and nonnegative')
+        raise IngestionError('Readings must be finite and nonnegative')
+    if values.index.hasnans:
+        raise IngestionError('Reading timestamps must not be missing')
     rows = [{'meter_id': meter_id, 'ts_utc': ts_text(ts), 'value': float(value)}
             for ts, value in values.items()]
     count = select(func.count()).select_from(reading_table).where(reading_table.c.meter_id == meter_id)
@@ -134,10 +169,12 @@ def save_readings(con, meter_id, values):
         raise
 
 
+@database_operation
 def list_buildings(con):
     return [dict(row) for row in con.execute(select(building_table).order_by(building_table.c.id)).mappings()]
 
 
+@database_operation
 def load_building(con, building_id):
     row = con.execute(select(building_table).where(building_table.c.id == building_id)).mappings().first()
     return dict(row) if row else None
@@ -147,6 +184,7 @@ def _reading_join():
     return reading_table.join(meter_table).join(zone_table)
 
 
+@database_operation
 def load_readings(con, building_id, start, end, kind='electricity'):
     statement = select(reading_table.c.ts_utc.label('ts'), zone_table.c.name.label('zone'),
                        reading_table.c.value).select_from(_reading_join()).where(
@@ -158,6 +196,7 @@ def load_readings(con, building_id, start, end, kind='electricity'):
     return df
 
 
+@database_operation
 def latest_ts(con, building_id=None):
     statement = select(func.max(reading_table.c.ts_utc)).select_from(_reading_join()).where(
         meter_table.c.kind == 'electricity')

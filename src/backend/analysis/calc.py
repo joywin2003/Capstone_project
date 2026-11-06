@@ -3,6 +3,8 @@
 import numpy as np
 import pandas as pd
 
+from backend.errors import AnalysisError
+
 def total_kwh(kwh):
     """Sum all 15-min energy values -> total kWh (2 d.p)"""
     total = kwh.sum()
@@ -27,6 +29,9 @@ def co2_kg(energy_kwh, kg_per_kwh):
 
 def completeness(n_readings, period_days, interval_min=15):
     """Share of reading are really using (- rejected)"""
+    if (not all(np.isfinite(x) for x in (n_readings, period_days, interval_min))
+            or n_readings < 0 or period_days < 0 or interval_min <= 0):
+        raise AnalysisError('Completeness needs nonnegative counts/period and a positive interval')
     minutes_in_period = period_days * 24 * 60
     expected_readings = minutes_in_period / interval_min
 
@@ -40,6 +45,8 @@ def completeness(n_readings, period_days, interval_min=15):
 def eui_per_year(energy_kwh, floor_area_m2, period_days):
     """Energy Use Intensity (EUI)"""
 
+    if any(not np.isfinite(x) for x in (energy_kwh, floor_area_m2, period_days)) or floor_area_m2 <= 0 or period_days <= 0:
+        raise AnalysisError('Floor area and period must be finite and positive')
     kwh_per_m2 = energy_kwh / floor_area_m2
 
     scale_to_year = 365 / period_days
@@ -98,6 +105,8 @@ def intensity_points(eui_year, benchmark):
         ( EUI <= 0.5 B : 100 pts | EUI == B : 50 pts | EUI >= 1.5 B : 0 pts)
     """
 
+    if not np.isfinite(benchmark) or benchmark <= 0:
+        raise AnalysisError('Intensity benchmark must be finite and positive')
     I_pts = clamp(100 * (1.5 - (eui_year / benchmark)))
 
     return I_pts
@@ -156,6 +165,13 @@ def change_pct(now, before):
 def forecast_same_hour(hourly, days=7, weeks=4):
     """Next reading at time, t = Average of last four weeks of reading at exact time, t"""
 
+    if (isinstance(days, bool) or not isinstance(days, int) or not 1 <= days <= 30
+            or isinstance(weeks, bool) or not isinstance(weeks, int) or weeks <= 0):
+        raise AnalysisError('Forecast needs 1–30 days and a positive integer history window')
+    if (hourly.empty or not isinstance(hourly.index, pd.DatetimeIndex)
+            or hourly.index.tz is None or not hourly.index.is_monotonic_increasing
+            or not hourly.index.is_unique or not np.isfinite(hourly.to_numpy()).all()):
+        raise AnalysisError('Forecast needs finite, ordered, timezone-aware hourly history')
     # keep only the last 4 weeks of hourly values
     last_hour = hourly.index.max()
     cutoff = last_hour - pd.Timedelta(weeks = weeks)
@@ -177,7 +193,9 @@ def forecast_same_hour(hourly, days=7, weeks=4):
     values = []
     for ts in future:
         key = (ts.day_of_week, ts.hour)         # e.g. (0, 10) => Monday 10:00
-        values.append(profile.get(key, np.nan)) # NaN if that hour never appeared
+        if key not in profile:
+            raise AnalysisError('Insufficient history for the requested weekday/hour forecast')
+        values.append(profile[key]) # NaN if that hour never appeared
 
     forecast = pd.Series(values, index = future, name = "forecast_kwh")
 

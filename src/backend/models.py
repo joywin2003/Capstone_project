@@ -1,10 +1,13 @@
 """models.py - the objects: buildings, zones and meters
- 
+
 Current Program - uses ONE zone ("Whole building") with ONE electricity meter per building
 The classes are already built for FUTURE DEV - many zones per building, many sensors per zone
 """
 
 from abc import ABC, abstractmethod
+from math import isfinite
+
+from backend.errors import ModelError
 
 class Meter:
     """One measuring device inside a zone (electricity meter for current program; thermometer, CO2 sensor for later dev)"""
@@ -27,7 +30,7 @@ class EnergyMeter(Meter):
 
 
 class Zone:
-    """A part of a building (e.g. floor, wing or room) 
+    """A part of a building (e.g. floor, wing or room)
     - one zone (whole building) for current program
     - multi-zones for later dev"""
 
@@ -47,8 +50,8 @@ class Building(ABC):
     building_type = "building"      # every subclass overwrites this value
 
     def __init__(self, name, floor_area_m2):
-        if floor_area_m2 <= 0:
-            raise ValueError(f"{name} : floor area must be > 0; but got {floor_area_m2}")
+        if not isinstance(floor_area_m2, (int, float)) or not isfinite(floor_area_m2) or floor_area_m2 <= 0:
+            raise ModelError(f"{name} : floor area must be > 0; but got {floor_area_m2}")
 
         self.name = name
         self.floor_area_m2 = float(floor_area_m2)
@@ -111,8 +114,8 @@ def make_building(building_type, name, floor_area_m2):
         cls = BUILDING_CLASSES[building_type]
 
     except KeyError:
-        # Catch any unknown type and raise a clear ValueError 
-        raise ValueError(f"Unknown building type {building_type!r}") from None  
+        # Catch any unknown type and raise a clear ValueError
+        raise ModelError(f"Unknown building type {building_type!r}") from None
         # from None --> hide internal KeyError and produces a clearer error message
 
     return cls(name, floor_area_m2)

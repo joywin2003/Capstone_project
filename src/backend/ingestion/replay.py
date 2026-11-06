@@ -6,6 +6,7 @@ import time
 import pandas as pd
 
 from backend import settings
+from backend.errors import EnergyPlatformError, StreamProcessingError
 from backend.db import database
 from backend.ingestion import opsd
 from backend.streaming.events import EnergyEvent
@@ -17,7 +18,7 @@ def run(pause=None):
     data = settings.CONFIG['data']
     pause = data['replay_seconds'] if pause is None else pause
     if pause < 0:
-        raise ValueError('Replay pause must be nonnegative')
+        raise StreamProcessingError('Replay pause must be nonnegative')
     entries = settings.CONFIG['buildings']
     start = pd.Timestamp(data['replay_from'], tz=settings.LOCAL_TZ)
     end = pd.Timestamp(data['end'], tz=settings.LOCAL_TZ)
@@ -61,4 +62,7 @@ def run(pause=None):
 
 
 if __name__ == '__main__':
-    run()
+    try:
+        run()
+    except EnergyPlatformError as exc:
+        raise SystemExit(f'Replay failed: {exc}') from exc

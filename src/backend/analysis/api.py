@@ -1,6 +1,5 @@
 """api.py - Service Layer of the Database & Analysis section (ONE door to our data)
-v0 - functions return hard-coded example data in the agreed shape so @team can build on it now
-v1 - functions return correct data
+Functions read persisted energy data through the database access layer.
 
 @team the Dashboard and the AI Advisor call ONLY these functions and never the database
 - building_id = an int from list_buildings()
@@ -17,19 +16,22 @@ from backend import settings
 from backend.analysis import calc
 from backend.db import database
 from backend.models import make_building
+from backend.errors import AnalysisError, BuildingNotFoundError, RequestValidationError
 
 
 # ---------- INTERNAL FUNCTIONS (@team DO NOT CALL THESE) ----------
 
 def _local(ts):
     """make any time = Berlin time"""
-    ts = pd.Timestamp(ts)
-    if ts.tzinfo is None:
-        # no time zone -> Berlin Time
-        return ts.tz_localize(settings.LOCAL_TZ)
-    else:
-        # already has time zone -> show same moment on Berlin clock
+    try:
+        ts = pd.Timestamp(ts)
+        if pd.isna(ts):
+            raise ValueError('Missing timestamp')
+        if ts.tzinfo is None:
+            return ts.tz_localize(settings.LOCAL_TZ)
         return ts.tz_convert(settings.LOCAL_TZ)
+    except (ValueError, TypeError, OverflowError) as exc:
+        raise RequestValidationError('Use a valid ISO timestamp; include an offset for DST transitions') from exc
 
 
 def _building(con, building_id):
@@ -38,7 +40,7 @@ def _building(con, building_id):
     """
     row = database.load_building(con, building_id)
     if row is None:
-        raise ValueError(f"Unknown building id {building_id}")
+        raise BuildingNotFoundError(f"Unknown building id {building_id}")
 
     building_type = row["type"]
     name = row["name"]
@@ -52,7 +54,7 @@ def _readings(building_id, start, end):
     start = _local(start)
     end = _local(end)
     if start >= end:
-        raise ValueError(f"start ({start}) must be before end ({end})")
+        raise RequestValidationError(f"start ({start}) must be before end ({end})")
 
     # open database; 'closing' shuts it again automatically even after an error
     with closing(database.connect()) as con:
@@ -171,7 +173,11 @@ def get_kpis(building_id, start, end):
 # Energy per hour/day, one column per zone (data for chart plot)
 def get_timeseries(building_id, start, end, freq="1h"):
     """-> table: one row per hour/day, one column per zone, kWh values"""
+    if freq not in {'15min', '1h', '1D'}:
+        raise RequestValidationError('freq must be 15min, 1h, or 1D')
     building, df, start, end = _readings(building_id, start, end)
+    if df.empty:
+        return pd.DataFrame(index=pd.DatetimeIndex([], tz=settings.LOCAL_TZ, name='ts'))
 
     # long table (ts, zone, value) -> wide table: one column per zone
     wide = df.pivot_table(index="ts", columns="zone", values="value", aggfunc="sum")   # aggfunc="sum" => if 2 rows land in same cell, add them
@@ -224,7 +230,7 @@ def get_score(building_id, start, end):
 
     building, kwh, start, end = _energy(building_id, start, end)
     if kwh.empty:
-        raise ValueError(f"No readings for building {building_id} in this period")
+        raise AnalysisError(f"No readings for building {building_id} in this period")
 
     # P1: Intensity
     energy = calc.total_kwh(kwh)
@@ -264,13 +270,15 @@ def get_score(building_id, start, end):
 def get_forecast(building_id, days=7):
     """-> table: one row per future hour, column forecast_kwh"""
 
+    if isinstance(days, bool) or not isinstance(days, int) or not 1 <= days <= 30:
+        raise RequestValidationError('Forecast days must be an integer between 1 and 30')
     # Find the newest reading (and check id exists)
     with closing(database.connect()) as con:
         _building(con, building_id)     # unknown id -> ValueError
         last = database.latest_ts(con, building_id)
 
     if last is None:
-        raise ValueError(f"No readings for building {building_id}")
+        raise AnalysisError(f"No readings for building {building_id}")
 
     # Load the last 4 weeks, up including newest reading
     four_weeks_ago = last - pd.Timedelta(weeks=4)

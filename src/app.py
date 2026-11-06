@@ -2,6 +2,9 @@ from pathlib import Path
 
 import streamlit as st
 
+from backend.errors import DashboardError
+from ui.errors import dashboard_action
+
 st.set_page_config(
     page_title="AI Smart Energy Management",
     page_icon=":material/bolt:",
@@ -63,4 +66,7 @@ pages = st.navigation(
     ]
 )
 
-pages.run()
+try:
+    dashboard_action(pages.run)
+except DashboardError as error:
+    st.error(str(error))

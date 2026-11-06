@@ -2,15 +2,34 @@
     RUN IT ONCE ->> Run: python -m backend.ingestion.opsd
 """
 
+from contextlib import closing
+from functools import wraps
+
+import numpy as np
 import pandas as pd
 
 from backend import settings
 from backend.db import database
 from backend.models import EnergyMeter, Zone, make_building
+from backend.errors import EnergyPlatformError, IngestionError
+
+
+def ingestion_operation(function):
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        try:
+            return function(*args, **kwargs)
+        except EnergyPlatformError:
+            raise
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            raise IngestionError(f'Cannot process energy data in {function.__name__}; check the input and configuration') from exc
+    return wrapped
+
 
 INTERVAL = pd.Timedelta("15min")    # Meters report their readings every 15min
 
 # Turn big CSV data concerned to a table with time as row label
+@ingestion_operation
 def read_opsd(csv_path, columns):
     """Read only the columns we need; each value is a meter TOTAL (cumulative kWh)"""
 
@@ -29,9 +48,13 @@ def read_opsd(csv_path, columns):
 
 # Meters provide the TOTAL ENERGY consumed
 # -> need to find ENERGY USED in the 15 min intervals (between readings)
+@ingestion_operation
 def to_intervals(totals):
     """Meter Energy_Total -> kWh used in each 15 min interval"""
     # totals = table of total_energy
+    if (not isinstance(totals.index, pd.DatetimeIndex) or totals.index.tz is None
+            or not totals.index.is_unique or not totals.index.is_monotonic_increasing):
+        raise IngestionError('Meter totals need unique, ordered, timezone-aware timestamps')
     totals = totals.dropna()    # .dropna() = remove empty cells
 
     # energy_used = total_energy - previous total_energy
@@ -56,15 +79,19 @@ def to_intervals(totals):
 
 # VALIDATE DATA
 # some buildings cannot exceed a certain energy maximum for their electrical network type and energy used needs to be positive
+@ingestion_operation
 def validate(used, max_kwh):
     """Keep only physically possible values | Returns (good values, number rejected)"""
-    ok = (used >= 0) & (used <= max_kwh)
+    if not np.isfinite(max_kwh) or max_kwh <= 0:
+        raise IngestionError('Maximum interval energy must be finite and positive')
+    ok = np.isfinite(used) & (used >= 0) & (used <= max_kwh)
     good_values = used[ok]
     num_rejected = int((~ok).sum())
     return good_values, num_rejected
 
 
 # Take a [[Building Block]] from config.toml and make it into real Python object (model.py)
+@ingestion_operation
 def build_from_config(entry):
     """one [[buildings]] entry from config.toml -> Building w/ 1 zone & 1 meter"""
 
@@ -92,6 +119,7 @@ def build_from_config(entry):
 
 
 # Clean Big raw table and give back 15-min Building Energy values
+@ingestion_operation
 def prepare(raw, entry, start, end):
     """Building's Column from CSV --> validated 15-min kWh between start (included) and end (excluded)"""
     # raw = CSV data
@@ -144,24 +172,26 @@ def run():
     raw = read_opsd(csv_file, columns_needed)
 
     # Open database then handle each building
-    con = database.connect()
-    database.create_tables(con)
+    with closing(database.connect()) as con:
+        database.create_tables(con)
 
-    for entry in all_buildings:
-        building = build_from_config(entry)     # create building objects
-        database.save_building(con, building)
+        for entry in all_buildings:
+            building = build_from_config(entry)     # create building objects
+            database.save_building(con, building)
 
-        good_values, num_rejected = prepare(raw, entry, start, stop)
+            good_values, num_rejected = prepare(raw, entry, start, stop)
 
-        meter = building.meters("electricity")[0]
-        added = database.save_readings(con, meter.id, good_values)
+            meter = building.meters("electricity")[0]
+            added = database.save_readings(con, meter.id, good_values)
 
-        print(f"{building.name:<11} id={building.id} {added:6d} new readings {num_rejected} rejected")
+            print(f"{building.name:<11} id={building.id} {added:6d} new readings {num_rejected} rejected")
 
-    con.close()
-    print("Done ->", settings.DB_PATH)
+    print("Done -> energy database")
 
 # ONLY run the import when this file is started, not when imported
 if __name__ == "__main__":
-    run()
+    try:
+        run()
+    except EnergyPlatformError as exc:
+        raise SystemExit(f'Ingestion failed: {exc}') from exc
 

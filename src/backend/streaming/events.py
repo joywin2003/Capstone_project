@@ -5,8 +5,7 @@ from datetime import datetime
 from math import isfinite
 
 
-class StreamProcessingError(ValueError):
-    """An event or a processor configuration is invalid."""
+from backend.errors import StreamProcessingError
 
 
 @dataclass(frozen=True)

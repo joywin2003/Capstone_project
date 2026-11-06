@@ -6,7 +6,7 @@ import os
 import pandas as pd
 import pytest
 from sqlalchemy.engine import make_url
-from sqlalchemy.exc import SQLAlchemyError
+from backend.errors import DatabaseAccessError
 
 from backend.db import database
 from backend.db.seed import initialize
@@ -50,7 +50,7 @@ def test_mysql_repeated_ingestion_is_idempotent(mysql_url):
 
 def test_mysql_constraint_failure_rolls_back_batch(mysql_url):
     with closing(database.engine_for(mysql_url).connect()) as con:
-        with pytest.raises(SQLAlchemyError):
+        with pytest.raises(DatabaseAccessError):
             database.save_readings(con, 999999, pd.Series([1.0, 2.0], index=pd.date_range('2017-01-01', periods=2, freq='15min', tz='UTC')))
         assert con.execute(database.select(database.func.count()).select_from(database.reading_table)).scalar_one() == 192
 

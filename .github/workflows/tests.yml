@@ -1,0 +1,34 @@
+name: Homework verification
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-password
+          MYSQL_DATABASE: energy_homework_test_ci
+          MYSQL_USER: energy_test
+          MYSQL_PASSWORD: ci-test-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+      - run: python -m pip install -e '.[test]'
+      - run: python -m pip check
+      - run: python -m pytest --cov=backend --cov-report=term-missing -q
+      - run: python -m pytest -m integration -q
+        env:
+          TEST_DATABASE_URL: mysql+pymysql://energy_test:ci-test-password@127.0.0.1:3306/energy_homework_test_ci

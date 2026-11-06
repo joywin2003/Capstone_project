@@ -3,14 +3,13 @@
 import json
 
 import click
-import pandas as pd
 from flask import Flask, jsonify, render_template, request
-from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.exceptions import HTTPException
 
 from backend import settings
 from backend.analysis import api
 from backend.db import database
+from backend.errors import EnergyPlatformError, RequestValidationError
 
 
 def create_app(test_config=None):
@@ -44,7 +43,7 @@ def create_app(test_config=None):
     def period():
         start, end = request.args.get('start'), request.args.get('end')
         if not start or not end:
-            raise ValueError('Both start and end are required')
+            raise RequestValidationError('Both start and end are required')
         return start, end
 
     @app.get('/api/buildings/<int:building_id>/kpis')
@@ -55,20 +54,22 @@ def create_app(test_config=None):
     def timeseries(building_id):
         frequency = request.args.get('freq', '1h')
         if frequency not in {'15min', '1h', '1D'}:
-            raise ValueError('freq must be 15min, 1h, or 1D')
+            raise RequestValidationError('freq must be 15min, 1h, or 1D')
         frame = api.get_timeseries(building_id, *period(), freq=frequency)
         # Pandas emits strict JSON null for missing values and ISO timestamps.
         return jsonify(json.loads(frame.reset_index().to_json(orient='records', date_format='iso')))
 
-    @app.errorhandler(ValueError)
-    def invalid_request(error):
-        status = 404 if str(error).startswith('Unknown building id') else 400
-        return jsonify(error={'code': 'invalid_request', 'message': str(error)}), status
+    @app.errorhandler(EnergyPlatformError)
+    def domain_failure(error):
+        if error.status_code >= 500:
+            app.logger.error('Energy subsystem failed', exc_info=error)
+        message = str(error) if error.status_code < 500 else 'Energy service is temporarily unavailable'
+        return jsonify(error={'code': error.code, 'message': message}), error.status_code
 
-    @app.errorhandler(SQLAlchemyError)
-    def database_failure(error):
-        app.logger.error('Database operation failed', exc_info=error)
-        return jsonify(error={'code': 'database_unavailable', 'message': 'Energy data is temporarily unavailable'}), 503
+    @app.errorhandler(Exception)
+    def unexpected_failure(error):
+        app.logger.error('Unexpected energy service failure', exc_info=error)
+        return jsonify(error={'code': 'internal_error', 'message': 'An unexpected error occurred'}), 500
 
     @app.errorhandler(HTTPException)
     def http_error(error):
@@ -78,7 +79,10 @@ def create_app(test_config=None):
     @click.option('--sample', is_flag=True, help='Seed a small deterministic electricity dataset.')
     def init_db(sample):
         from backend.db.seed import initialize
-        initialize(app.config['DATABASE_URL'], sample=sample)
+        try:
+            initialize(app.config['DATABASE_URL'], sample=sample)
+        except EnergyPlatformError as exc:
+            raise click.ClickException(str(exc)) from exc
         click.echo('Database initialized' + (' with sample data' if sample else ''))
 
     return app

@@ -49,6 +49,19 @@ python -m flask --app backend.web.app run --port 5001
 
 MySQL is still required for grading Homework 3. See [API documentation](docs/API.md), [architecture](docs/ARCHITECTURE.md), and [MySQL verification](docs/TESTING.md).
 
+## Homework 4: exceptions and automated tests
+
+`HomeworkAssignment4` includes the complete cumulative implementation. Every implemented subsystem has a custom exception class in `backend.errors`, with handling at the Flask, CLI, or dashboard boundary. Errors retain diagnostic causes while public responses hide database/provider internals. A provider-injected advisor adapter demonstrates timeout handling; live OpenAI integration remains future work.
+
+```bash
+python -m pytest -q
+python -m pytest --cov=backend --cov=ui.errors --cov-report=term-missing -q
+```
+
+Verified: **46 local tests passed**, plus **4 tests passed against real MySQL 8.4.11**. This exceeds the requirement of 15 distinct tests. The local suite covers streaming, models, formulas, ingestion/replay, SQLite persistence, Flask responses, configuration, dashboard handling, and advisor failure boundaries. MySQL tests run separately with a disposable test database; see [testing instructions and results](docs/TESTING.md). A GitHub Actions workflow runs both suites after publication; a remote CI pass is not claimed until observed.
+
+See [submission links and remaining student details](docs/SUBMISSION.md).
+
 ## Class diagrams
 
 ```mermaid
@@ -139,11 +152,17 @@ To run the existing dashboard, install its dependencies from `requirements.txt`,
 
 ## Five-minute video
 
-**Recording/link pending — the student must record and upload the demonstration before submission.** Follow the [video script](docs/VIDEO_SCRIPT.md), then replace this notice with the accessible video URL. No video has been uploaded by this implementation.
+[Watch or download the five-minute Homework 2 walkthrough](https://raw.githubusercontent.com/joywin2003/Capstone_project/HomeworkAssignment2/docs/homework2-demo.mp4).
+
+This is an automated code walkthrough with synthetic narration and captured demo/test output, not a recording of a student speaking. The [video script](docs/VIDEO_SCRIPT.md) is available if your lecturer requires a personal recording. The MP4 is also stored at `docs/homework2-demo.mp4`.
 
 ## Submission
 
-Homework 2 branch: `HomeworkAssignment2`. Submit its verified GitHub branch URL and commit SHA, plus the video link. See the [homework plan](docs/HOMEWORK_PLAN.md) for the full roadmap. Homework 3 and 4 are cumulative follow-up branches.
+- [Homework 2 — stream processing](https://github.com/joywin2003/Capstone_project/tree/HomeworkAssignment2)
+- [Homework 3 — Flask and MySQL](https://github.com/joywin2003/Capstone_project/tree/HomeworkAssignment3)
+- [Homework 4 — exception handling and tests](https://github.com/joywin2003/Capstone_project/tree/HomeworkAssignment4)
+
+Submit the matching branch link and commit SHA in each course assignment field. These branches are published to the student's fork because the team repository rejected this account's write access. See the [original homework plan](docs/HOMEWORK_PLAN.md) and [submission checklist](docs/SUBMISSION.md).
 
 ## Scope and data assumptions
 

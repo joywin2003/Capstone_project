@@ -26,7 +26,7 @@ Install the project first with `python -m pip install -e .`. Set `DATABASE_URL` 
 | `get_score(building_id, start, end)` | dict: score (0-100), grade (A-E), intensity_points, after_hours_points, ... |
 | `get_forecast(building_id, days=7)` | DataFrame, forecast_kwh per hour |
  
-Dates without a time zone mean Berlin time; `end` is excluded. Bad input raises `ValueError`.
+Dates without a time zone mean Berlin time; `end` is excluded. Invalid requests raise `RequestValidationError`; missing buildings raise `BuildingNotFoundError`. Both retain `ValueError` compatibility. Other subsystem failures use the hierarchy in `backend.errors`.
  
 ## Files
  
