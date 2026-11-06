@@ -145,7 +145,7 @@ This is an automated code walkthrough with synthetic narration and captured demo
 
 ## Submission
 
-Published homework branches use the student's fork because the team repository denied this account write access:
+Homework submission links:
 
 - [Homework 2](https://github.com/joywin2003/Capstone_project/tree/HomeworkAssignment2)
 - [Homework 3](https://github.com/joywin2003/Capstone_project/tree/HomeworkAssignment3)
