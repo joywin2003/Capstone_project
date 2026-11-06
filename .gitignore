@@ -26,3 +26,6 @@ energy.db*
 
 # Downloaded datasets
 data/raw/*.csv
+# Offline demo/test databases
+energy-demo.db*
+*.sqlite3

@@ -1,9 +1,11 @@
 # Database & Analysis (src/backend)
  
-Owner: Ourvish Lofur. @team uses this section ONLY through `backend.analysis.api`.
+Original subsystem owner: Ourvish Lofur. Homework integration: Joywin Bennis. @team uses this section ONLY through `backend.analysis.api`.
  
 ## Quick start
  
+Install the project first with `python -m pip install -e .`. Set `DATABASE_URL` for MySQL as described in the root README, or omit it to use local SQLite. The sample Flask initialization works without downloading OPSD.
+
 1. Download the OPSD file (60 MB, not in Git) into `data/raw/`:
    https://data.open-power-system-data.org/household_data/2020-04-15/household_data_15min_singleindex.csv
 2. Build the database (about 1 second, safe to repeat):
@@ -30,7 +32,7 @@ Dates without a time zone mean Berlin time; `end` is excluded. Bad input raises 
  
 - `settings.py` reads `config.toml` (all assumptions: prices, CO2 factor, benchmarks, buildings)
 - `models.py` Building (abstract) -> Home, Business, PublicBuilding; Zone; Meter -> EnergyMeter
-- `db/database.py` SQLite tables building, zone, meter, reading; the only file with SQL
+- `db/database.py` SQLAlchemy tables building, zone, meter, reading (MySQL or offline SQLite); the only file with SQL
 - `ingestion/opsd.py` meter totals -> 15-min kWh, validation, saves to the database
 - `ingestion/replay.py` feeds December 2016 in one reading at a time ("real-time")
 - `analysis/calc.py` pure formulas; `analysis/api.py` the service layer
@@ -39,7 +41,7 @@ Dates without a time zone mean Berlin time; `end` is excluded. Bad input raises 
  
 The container needs `config.toml`, the CSV in `data/raw/` (or a ready `energy.db`),
 and `python -m backend.ingestion.opsd` once before the dashboard starts.
-`DB_PATH` (environment variable) moves the database file, e.g. into a volume.
+`DATABASE_URL` selects MySQL or offline SQLite; `DB_PATH` remains the fallback SQLite file path. See the root README for the MySQL Compose service.
  
 ## Known limits (v1)
  
@@ -56,4 +58,4 @@ Savings compare with the previous period of the same length, not weather-correct
   -7.0 % vs October; score 35.8 (E) = 0.6 x 48.8 + 0.4 x 16.2.
 - Live replay: `get_latest` moves into December; Ctrl+C stops cleanly.
 - Bad input (unknown building id, start after end) raises `ValueError`.
-- No automated tests yet (planned: pytest suite for models, database, calc, api).
+- Automated streaming tests and MySQL integration checks are in `tests/`; see `docs/TESTING.md` for current verification.

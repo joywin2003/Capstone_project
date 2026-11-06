@@ -18,6 +18,37 @@ for result in pipeline.run(HistoricalEnergyStream.from_csv("data/sample/energy_e
 
 Average power is `energy_kwh * 60 / interval_minutes`. The filter removes inactive meters and power strictly below the threshold. The transformer calculates estimated EUR and kg CO2 using configurable demonstration factors. OPSD replay uses these same processors; all valid readings remain in storage so low-use filtering does not distort consumption reports.
 
+## Homework 3: Flask and MySQL
+
+The cumulative `HomeworkAssignment3` branch adds a Flask application factory, an HTML building table, JSON endpoints, SQLAlchemy database access, and MySQL configuration. SQLite remains an explicit offline option. No PostgreSQL setup is required for this assignment.
+
+After the Python setup below, copy `.env.example` to `.env`, choose local passwords, and keep `DATABASE_URL` consistent with the MySQL password. With Docker Desktop running:
+
+```bash
+cp .env.example .env
+# Edit .env to set local passwords and DATABASE_URL.
+docker compose up -d --wait
+python -m flask --app backend.web.app init-db --sample
+python -m flask --app backend.web.app run --port 5001
+```
+
+Open `http://127.0.0.1:5001/` to see the database-backed table. Sample data contains 96 quarter-hour readings per building for 1 December 2016 UTC. It is synthetic and independent of the usage-filter demo fixture.
+
+```bash
+curl http://127.0.0.1:5001/api/buildings
+curl 'http://127.0.0.1:5001/api/buildings/1/kpis?start=2016-12-01T00:00:00Z&end=2016-12-02T00:00:00Z'
+```
+
+Expected first-building totals: `48 kWh`, `14.40 EUR`, completeness `1.0`. For a local offline demonstration, override the database explicitly:
+
+```bash
+export DATABASE_URL=sqlite:///energy-demo.db
+python -m flask --app backend.web.app init-db --sample
+python -m flask --app backend.web.app run --port 5001
+```
+
+MySQL is still required for grading Homework 3. See [API documentation](docs/API.md), [architecture](docs/ARCHITECTURE.md), and [MySQL verification](docs/TESTING.md).
+
 ## Class diagrams
 
 ```mermaid
