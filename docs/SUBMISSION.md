@@ -10,8 +10,6 @@
 
 [Five-minute Homework 2 video](https://raw.githubusercontent.com/joywin2003/Capstone_project/HomeworkAssignment2/docs/homework2-demo.mp4): automated code walkthrough with synthetic narration and actual captured command output. If the lecturer expects a personal oral presentation, use `VIDEO_SCRIPT.md` to record a replacement.
 
-The student fork is used because `joywin2003` was denied write permission to the original `shre-afk/Capstone_project` repository. Existing origin/team history is retained; no team branch was overwritten.
-
 ## Student details to complete
 
 - Submitting student: Joywin Bennis — confirm the spelling used in course registration.
@@ -37,4 +35,4 @@ These details were not invented. Complete them before grading. Put only required
 5. Check GitHub Actions on Homework 4 and address any environment-specific failures.
 6. Copy the branch URL and the commit SHA shown on GitHub into the matching course submission form.
 
-The assistant prepares and publishes the repository artifacts; the student submits them through the lecturer's course portal. No course portal submission is claimed here.
+Submit the matching branch URLs through the course portal.

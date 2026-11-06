@@ -162,7 +162,7 @@ This is an automated code walkthrough with synthetic narration and captured demo
 - [Homework 3 — Flask and MySQL](https://github.com/joywin2003/Capstone_project/tree/HomeworkAssignment3)
 - [Homework 4 — exception handling and tests](https://github.com/joywin2003/Capstone_project/tree/HomeworkAssignment4)
 
-Submit the matching branch link and commit SHA in each course assignment field. These branches are published to the student's fork because the team repository rejected this account's write access. See the [original homework plan](docs/HOMEWORK_PLAN.md) and [submission checklist](docs/SUBMISSION.md).
+Submit the matching branch link and commit SHA in each course assignment field. See the [original homework plan](docs/HOMEWORK_PLAN.md) and [submission checklist](docs/SUBMISSION.md).
 
 ## Scope and data assumptions
 
