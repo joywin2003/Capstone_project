@@ -12,7 +12,7 @@ def csv_events(path):
         with open(path, newline="", encoding="utf-8") as handle:
             for line, row in enumerate(csv.DictReader(handle), start=2):
                 try:
-                    if row["active"].lower() not in {"true", "false"}:
+                    if not isinstance(row["active"], str) or row["active"].lower() not in {"true", "false"}:
                         raise ValueError("active must be true or false")
                     yield EnergyEvent(
                         int(row["building_id"]), int(row["meter_id"]),

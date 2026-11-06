@@ -108,12 +108,24 @@ To run the existing dashboard, install its dependencies from `requirements.txt`,
 
 ## Five-minute video
 
-**Recording/link pending — the student must record and upload the demonstration before submission.** Follow the [video script](docs/VIDEO_SCRIPT.md), then replace this notice with the accessible video URL. No video has been uploaded by this implementation.
+[Watch or download the five-minute Homework 2 walkthrough](https://raw.githubusercontent.com/joywin2003/Capstone_project/HomeworkAssignment2/docs/homework2-demo.mp4).
+
+This is an automated code walkthrough with synthetic narration and captured demo/test output, not a recording of a student speaking. Follow the [video script](docs/VIDEO_SCRIPT.md) if the lecturer requires a personal recording. The MP4 is also stored at `docs/homework2-demo.mp4`.
 
 ## Submission
 
-Homework 2 branch: `HomeworkAssignment2`. Submit its verified GitHub branch URL and commit SHA, plus the video link. See the [homework plan](docs/HOMEWORK_PLAN.md) for the full roadmap. Homework 3 and 4 are cumulative follow-up branches.
+Published homework branches use the student's fork because the team repository denied this account write access:
+
+- [Homework 2](https://github.com/joywin2003/Capstone_project/tree/HomeworkAssignment2)
+- [Homework 3](https://github.com/joywin2003/Capstone_project/tree/HomeworkAssignment3)
+- [Homework 4](https://github.com/joywin2003/Capstone_project/tree/HomeworkAssignment4)
+
+Submit the matching branch URL and commit SHA in the course portal. Homework 2 also includes the five-minute video above. Student ID, module details, and contributions must be completed before grading. See the [original plan](docs/HOMEWORK_PLAN.md) for the roadmap.
 
 ## Scope and data assumptions
 
 The wider capstone proposes portfolios, properties, buildings, electricity/gas/district heating, anomaly detection, forecasting, and an OpenAI advisor. This homework focuses on electricity and a few sample buildings. The existing OPSD import uses household-dataset residential/industrial/public columns; floor areas, tariffs, and benchmarks are assumptions. Existing seasonal forecasting is a baseline; the AI advisor is not yet integrated. PostgreSQL is a future capstone choice; Homework 3 uses the required MySQL database.
+
+## Verification for this branch
+
+The streaming suite passes **11 tests**. The five-minute MP4 was decoded successfully and checked for a nonempty narration track. Video generation tooling is optional: `python -m pip install pillow imageio-ffmpeg`, then on macOS run `python tools/create_homework_video.py`.
